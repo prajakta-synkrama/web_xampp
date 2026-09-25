@@ -225,7 +225,7 @@ function render_site_vhost(array $site): string
     DocumentRoot "{$root}"
     <Directory "{$root}">
         Options Indexes FollowSymLinks
-        AllowOverride FileInfo
+        AllowOverride All
         Require all granted
         DirectoryIndex index.php index.html
         <FilesMatch "\.php$">
