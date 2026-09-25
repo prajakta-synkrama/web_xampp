@@ -1,8 +1,8 @@
 # --- Zip / redistributable runtime (download separately) ---
 # Apache Lounge build (keep conf only)
-/Apache24/**
-!/Apache24/conf/
-!/Apache24/conf/**
+#/Apache24/**
+#!/Apache24/conf/
+#!/Apache24/conf/**
 
 # PHP Windows builds
 /php*/
