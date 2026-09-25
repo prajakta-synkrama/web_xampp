@@ -8,6 +8,10 @@
 /php*/
 /php*/**
 
+# Local mail catcher binary + DB (keep start scripts at repo root)
+/mailpit/**
+!/mailpit/.gitkeep
+
 # Apache Lounge / package junk
 /-- Win32 VS18  --
 /ReadMe.txt
@@ -21,13 +25,15 @@
 *.pid
 Apache24/logs/
 
-# --- htdocs: keep panel, phpmyadmin, root index only ---
+# --- htdocs: keep panel, phpmyadmin, mail-test, root index only ---
 /htdocs/**
 !/htdocs/index.php
 !/htdocs/panel/
 !/htdocs/panel/**
 !/htdocs/phpmyadmin/
 !/htdocs/phpmyadmin/**
+!/htdocs/mail-test/
+!/htdocs/mail-test/**
 
 # Local panel runtime (optional; uncomment to skip machine-specific data)
 # /htdocs/panel/data/settings.json

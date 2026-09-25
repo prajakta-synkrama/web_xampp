@@ -6,6 +6,12 @@ const WEB_ROOT = 'C:/web';
 const APACHE_BIN = WEB_ROOT . '/Apache24/bin/httpd.exe';
 const APACHE_ROOT = WEB_ROOT . '/Apache24';
 
+const MAILPIT_BIN = WEB_ROOT . '/mailpit/mailpit.exe';
+const MAILPIT_SMTP_PORT = 1025;
+const MAILPIT_UI_PORT = 8025;
+const MAILPIT_UI_URL = 'http://127.0.0.1:8025/';
+const MAILPIT_DATA = WEB_ROOT . '/mailpit/data';
+
 const DB_HOST = '127.0.0.1';
 const DB_USER = 'root';
 const DB_PASS = 'root';
@@ -349,6 +355,50 @@ function restart_apache_process(bool $deferred = false): array
     return ['ok' => true, 'message' => 'Apache restarted', 'detail' => $check['output']];
 }
 
+function start_mailpit(): array
+{
+    if (!is_file(MAILPIT_BIN)) {
+        return ['ok' => false, 'message' => 'Mailpit not installed (C:/web/mailpit/mailpit.exe)'];
+    }
+    if (port_listening(MAILPIT_SMTP_PORT)) {
+        return ['ok' => true, 'message' => 'Mailpit already running (SMTP :' . MAILPIT_SMTP_PORT . ')'];
+    }
+    if (!is_dir(MAILPIT_DATA)) {
+        @mkdir(MAILPIT_DATA, 0777, true);
+    }
+    $exe = str_replace('/', '\\', MAILPIT_BIN);
+    $db = str_replace('/', '\\', MAILPIT_DATA . '/mailpit.db');
+    $cmd = '"' . $exe . '" --smtp 127.0.0.1:' . MAILPIT_SMTP_PORT
+        . ' --listen 127.0.0.1:' . MAILPIT_UI_PORT
+        . ' --database "' . $db . '" --quiet';
+    start_hidden($cmd);
+    usleep(700000);
+    $up = port_listening(MAILPIT_SMTP_PORT);
+    return [
+        'ok' => $up,
+        'message' => $up
+            ? 'Mailpit started · SMTP :' . MAILPIT_SMTP_PORT . ' · UI ' . MAILPIT_UI_URL
+            : 'Failed to start Mailpit',
+    ];
+}
+
+function stop_mailpit(): array
+{
+    $pids = pids_on_port(MAILPIT_SMTP_PORT);
+    if (!$pids) {
+        // Also try UI port in case SMTP bind differs
+        $pids = pids_on_port(MAILPIT_UI_PORT);
+    }
+    if (!$pids) {
+        return ['ok' => true, 'message' => 'Mailpit was not running'];
+    }
+    foreach ($pids as $pid) {
+        run_cmd('taskkill /F /PID ' . (int)$pid);
+    }
+    usleep(300000);
+    return ['ok' => true, 'message' => 'Mailpit stopped'];
+}
+
 function service_status(): array
 {
     $default = default_php_version();
@@ -385,6 +435,15 @@ function service_status(): array
         'php' => $php,
         'default_php' => $default,
         'localhost_domains' => LOCALHOST_DOMAINS,
+        'mail' => [
+            'up' => port_listening(MAILPIT_SMTP_PORT),
+            'installed' => is_file(MAILPIT_BIN),
+            'smtp_host' => '127.0.0.1',
+            'smtp_port' => MAILPIT_SMTP_PORT,
+            'ui_port' => MAILPIT_UI_PORT,
+            'ui_url' => MAILPIT_UI_URL,
+            'label' => 'Mailpit',
+        ],
         'mysql' => [
             'up' => $mysqlUp,
             'port' => DB_PORT,

@@ -137,7 +137,7 @@ a:hover { text-decoration: underline; }
   display: grid;
   gap: 14px;
 }
-.grid.stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid.stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .grid.two { grid-template-columns: 1.1fr 1fr; }
 .grid.three { grid-template-columns: repeat(3, 1fr); }
 

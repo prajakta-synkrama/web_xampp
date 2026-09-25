@@ -1,4 +1,4 @@
-' Fully silent stack start — PHP + Apache, no console windows.
+' Fully silent stack start — PHP + Mailpit + Apache, no console windows.
 Option Explicit
 
 Dim WshShell, fso
@@ -10,6 +10,11 @@ Const WEB = "C:\web"
 StartPhp "C:\web\php7.4.33", 9074
 StartPhp "C:\web\php8.0.30", 9080
 StartPhp "C:\web\php8.4.26", 9084
+
+' Local mail catcher (SMTP 1025 / UI 8025)
+If fso.FileExists(WEB & "\start-mailpit-silent.vbs") Then
+  WshShell.Run "wscript //B //Nologo """ & WEB & "\start-mailpit-silent.vbs""", 0, False
+End If
 
 WScript.Sleep 2000
 

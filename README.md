@@ -1,4 +1,4 @@
-# Web Stack (Apache · PHP · MySQL)
+# Web Stack (Apache · PHP · MySQL · Mail)
 
 Local Windows web stack under `C:\web` with a control panel for sites, PHP config, logs, and database tools.
 
@@ -8,6 +8,7 @@ Local Windows web stack under `C:\web` with a control panel for sites, PHP confi
 | PHP 7.4.33 | `C:\web\php7.4.33\` | FastCGI `:9074` |
 | PHP 8.0.30 | `C:\web\php8.0.30\` | FastCGI `:9080` |
 | PHP 8.4.26 | `C:\web\php8.4.26\` | FastCGI `:9084` |
+| Mailpit | `C:\web\mailpit\` | Local SMTP catcher — SMTP `:1025`, UI `:8025` |
 | Site files | `C:\web\htdocs\` | Document root + panel |
 | Control panel | [http://localhost/panel/](http://localhost/panel/) | Localhost only |
 
@@ -115,55 +116,107 @@ C:\web\
   php7.4.33\         ← PHP TS x86
   php8.0.30\
   php8.4.26\
+  mailpit\           ← Mailpit binary (local mail catcher)
   htdocs\            ← sites + panel + phpMyAdmin
   start-stack.bat
   start-tray.bat
   …
 ```
 
-Apache, PHP zips, and logs are gitignored; the panel, scripts, and config templates stay in the repo.
+Apache, PHP zips, Mailpit binary, and logs are gitignored; the panel, scripts, and config templates stay in the repo.
 
 ---
 
-## 4. Start the stack
+## 4. Local mail server (Mailpit)
+
+[Mailpit](https://github.com/axllent/mailpit) catches mail from PHP `mail()` / SMTP apps. Nothing is delivered to the real internet.
+
+| | |
+|--|--|
+| SMTP | `127.0.0.1:1025` |
+| Web inbox | http://127.0.0.1:8025/ |
+| Binary | `C:\web\mailpit\mailpit.exe` |
+| Test page | http://localhost/mail-test/ |
+
+### Install / update Mailpit
+
+```bat
+mkdir C:\web\mailpit
+cd /d C:\web\mailpit
+curl -L -o mailpit.zip https://github.com/axllent/mailpit/releases/latest/download/mailpit-windows-amd64.zip
+tar -xf mailpit.zip
+del mailpit.zip
+```
+
+Or run `mailpit.exe version -u` inside `C:\web\mailpit` to self-update.
+
+### PHP wiring
+
+Each `php.ini` is set to:
+
+```ini
+SMTP = 127.0.0.1
+smtp_port = 1025
+sendmail_from = local@web.test
+```
+
+Restart the PHP FastCGI worker after changing these (panel → **Restart PHP**, or restart the stack).
+
+### Start / stop mail only
 
 | Action | Command |
 |--------|---------|
-| Start Apache + PHP (silent) | `start-stack.bat` or `start-stack-silent.vbs` |
+| Start | `start-mailpit.bat` |
+| Stop | `stop-mailpit.bat` |
+
+Mailpit also starts with `start-stack.bat` / the system tray.
+
+---
+
+## 5. Start the stack
+
+| Action | Command |
+|--------|---------|
+| Start Apache + PHP + Mail (silent) | `start-stack.bat` or `start-stack-silent.vbs` |
 | System tray | `start-tray.bat` |
 | PHP only | `start-php.bat` |
+| Mail only | `start-mailpit.bat` |
 | Stop non-default PHP | `stop-php.bat` |
 
 Then open:
 
 - Sites: http://localhost/
 - Panel: http://localhost/panel/
+- Mail inbox: http://127.0.0.1:8025/
+- Mail test: http://localhost/mail-test/
 - phpMyAdmin: http://localhost/phpmyadmin/
 
 ---
 
-## 5. Control panel
+## 6. Control panel
 
 http://localhost/panel/ (localhost only)
 
-- **Overview** — Apache / PHP / MySQL status, start/stop, default PHP for localhost  
+- **Overview** — Apache / PHP / MySQL / Mail status, start/stop, default PHP for localhost  
 - **Sites** — custom domains, document roots, per-site PHP version, hosts sync  
 - **PHP Config** — Simple / Advanced UI: On/Off toggles, error / warning / notice levels, limits  
 - **Config editor** — raw `httpd.conf` / `php.ini`  
 - **Logs** — Apache & PHP logs with filters  
 - **Database** — browse / run SQL  
+- **Mail inbox** — shortcut to Mailpit UI  
 
 Saving `php.ini` creates a `.bak-*` backup. Use **Restart PHP** in PHP Config so FastCGI workers reload the file.
 
 ---
 
-## 6. Quick checklist
+## 7. Quick checklist
 
 - [ ] VC++ x86 redistributable installed  
 - [ ] `C:\web\Apache24\bin\httpd.exe` present  
 - [ ] `C:\web\php7.4.33\php-cgi.exe` (and 8.0 / 8.4) present — **TS · x86**  
-- [ ] Each PHP folder has a working `php.ini`  
-- [ ] `start-stack.bat` → http://localhost/panel/ loads  
+- [ ] Each PHP folder has a working `php.ini` (`SMTP` → `127.0.0.1:1025`)  
+- [ ] `C:\web\mailpit\mailpit.exe` present  
+- [ ] `start-stack.bat` → http://localhost/panel/ and http://127.0.0.1:8025/ load  
 
 ---
 
@@ -173,4 +226,5 @@ Saving `php.ini` creates a `.bak-*` backup. Use **Restart PHP** in PHP Config so
 - Apache 2.4.68 Win32 VS18 zip: https://www.apachelounge.com/download/VS18/binaries/httpd-2.4.68-260920-win32-vs18.zip  
 - PHP downloads: https://www.php.net/downloads.php  
 - PHP 7.4.33 Windows builds: https://php.watch/versions/7.4/releases/7.4.33  
+- Mailpit releases: https://github.com/axllent/mailpit/releases  
 - VC++ redistributable (x86): https://aka.ms/vc14/vc_redist.x86.exe  

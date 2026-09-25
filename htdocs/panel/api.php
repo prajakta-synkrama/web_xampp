@@ -95,11 +95,20 @@ try {
             foreach (array_keys(PHP_VERSIONS) as $ver) {
                 start_php_version($ver);
             }
+            start_mailpit();
             $restart = restart_apache_process();
             if (!$restart['ok']) {
                 json_out(['ok' => false, 'message' => $restart['message'], 'detail' => $restart['detail'] ?? ''], 400);
             }
             json_out(['ok' => true, 'message' => 'Stack restarted (default PHP kept)', 'data' => service_status()]);
+
+        case 'start_mail':
+            $r = start_mailpit();
+            json_out(['ok' => $r['ok'], 'message' => $r['message'], 'data' => service_status()], $r['ok'] ? 200 : 400);
+
+        case 'stop_mail':
+            $r = stop_mailpit();
+            json_out(['ok' => $r['ok'], 'message' => $r['message'], 'data' => service_status()]);
 
         case 'config_get':
             $id = $_GET['id'] ?? '';

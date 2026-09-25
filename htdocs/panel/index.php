@@ -10,14 +10,14 @@ require __DIR__ . '/includes/bootstrap.php';
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/app.css?v=9">
+  <link rel="stylesheet" href="assets/app.css?v=10">
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
         <strong>Stack Panel</strong>
-        <span>Apache · PHP · MySQL</span>
+        <span>Apache · PHP · MySQL · Mail</span>
       </div>
       <nav class="nav">
         <button type="button" data-view="overview" class="active">Overview</button>
@@ -26,6 +26,7 @@ require __DIR__ . '/includes/bootstrap.php';
         <button type="button" data-view="config">Config editor</button>
         <button type="button" data-view="logs">Logs</button>
         <button type="button" data-view="database">Database</button>
+        <button type="button" onclick="window.open('http://127.0.0.1:8025/', '_blank')">Mail inbox</button>
         <button type="button" onclick="window.open('http://localhost/phpmyadmin/', '_blank')">Phpmyadmin</button>
       </nav>
     </aside>
@@ -43,6 +44,7 @@ require __DIR__ . '/includes/bootstrap.php';
         <div class="grid stats">
           <div class="card stat" id="stat-apache"></div>
           <div class="card stat" id="stat-mysql"></div>
+          <div class="card stat" id="stat-mail"></div>
           <div class="card stat" id="stat-runtime"></div>
           <div class="card stat">
             <div class="label">Controls</div>
@@ -57,6 +59,11 @@ require __DIR__ . '/includes/bootstrap.php';
             <div class="btn-row" style="margin-top:8px">
               <button class="btn" type="button" data-action="start_php">Start all PHP</button>
               <button class="btn danger" type="button" data-action="stop_php" title="Keeps default PHP for localhost">Stop others</button>
+            </div>
+            <div class="btn-row" style="margin-top:8px">
+              <button class="btn" type="button" data-action="start_mail">Start Mail</button>
+              <button class="btn danger" type="button" data-action="stop_mail">Stop Mail</button>
+              <a class="btn" href="http://127.0.0.1:8025/" target="_blank" rel="noopener">Open inbox</a>
             </div>
             <div class="meta" style="margin-top:10px">Default for localhost</div>
             <div class="btn-row" style="margin-top:6px">
@@ -422,6 +429,6 @@ require __DIR__ . '/includes/bootstrap.php';
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="assets/app.js?v=9"></script>
+  <script src="assets/app.js?v=10"></script>
 </body>
 </html>

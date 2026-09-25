@@ -92,6 +92,12 @@ function renderStatus() {
     <div class="value">${pill(s.mysql.up)}</div>
     <div class="sub">${s.mysql.version ? 'v' + s.mysql.version : 'root@' + s.mysql.port}</div>`;
 
+  const mail = s.mail || {};
+  $('#stat-mail').innerHTML = `
+    <div class="label">Mail (Mailpit)</div>
+    <div class="value">${mail.installed === false ? '<span class="pill down">Missing</span>' : pill(!!mail.up)}</div>
+    <div class="sub">SMTP :${mail.smtp_port || 1025} · <a href="${escapeAttr(mail.ui_url || 'http://127.0.0.1:8025/')}" target="_blank" rel="noopener">inbox</a></div>`;
+
   $('#stat-runtime').innerHTML = `
     <div class="label">This request</div>
     <div class="value">PHP ${s.runtime.php}</div>

@@ -97,9 +97,26 @@ function Start-Apache {
   }
 }
 
+function Start-Mailpit {
+  $vbs = Join-Path $WebRoot 'start-mailpit-silent.vbs'
+  if (Test-Path $vbs) {
+    Start-Process -FilePath 'wscript.exe' -ArgumentList @('//B', '//Nologo', "`"$vbs`"") -WindowStyle Hidden
+  }
+}
+
+function Stop-Mailpit {
+  $lines = & netstat -ano 2>$null | Select-String ':1025 ' | Select-String 'LISTENING'
+  foreach ($line in $lines) {
+    if ($line -match '\s(\d+)\s*$') {
+      Start-Process -FilePath 'taskkill.exe' -ArgumentList @('/F', '/PID', $Matches[1]) -WindowStyle Hidden -Wait
+    }
+  }
+}
+
 function Get-StatusText {
   $parts = @()
   $parts += if (Test-Port 80) { 'Apache: ON' } else { 'Apache: OFF' }
+  $parts += if (Test-Port 1025) { 'Mail:ON' } else { 'Mail:OFF' }
   $parts += if (Test-Port 9074) { '7.4:ON' } else { '7.4:OFF' }
   $parts += if (Test-Port 9080) { '8.0:ON' } else { '8.0:OFF' }
   $parts += if (Test-Port 9084) { '8.4:ON' } else { '8.4:OFF' }
@@ -151,8 +168,9 @@ function Add-Separator {
 
 Add-MenuItem 'Open Stack Panel' { Start-Process $PanelUrl } | Out-Null
 Add-MenuItem 'Open localhost' { Start-Process 'http://localhost/' } | Out-Null
+Add-MenuItem 'Open Mail inbox' { Start-Process 'http://127.0.0.1:8025/' } | Out-Null
 Add-Separator
-Add-MenuItem 'Start All (Apache + PHP)' { Start-StackSilent; Start-Sleep -Seconds 1; Update-Tray } | Out-Null
+Add-MenuItem 'Start All (Apache + PHP + Mail)' { Start-StackSilent; Start-Sleep -Seconds 1; Update-Tray } | Out-Null
 Add-MenuItem 'Stop PHP (keep default)' { Stop-PhpOthers; Update-Tray } | Out-Null
 Add-MenuItem 'Stop Apache' { Stop-Apache; Update-Tray } | Out-Null
 Add-MenuItem 'Restart Apache' {
@@ -162,6 +180,8 @@ Add-MenuItem 'Restart Apache' {
   Start-Sleep -Seconds 1
   Update-Tray
 } | Out-Null
+Add-MenuItem 'Start Mailpit' { Start-Mailpit; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
+Add-MenuItem 'Stop Mailpit' { Stop-Mailpit; Update-Tray } | Out-Null
 Add-Separator
 
 $statusItem = Add-MenuItem 'Status: …' $null
