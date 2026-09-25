@@ -140,7 +140,9 @@ function json_out(array $payload, int $code = 200): void
 function port_listening(int $port): bool
 {
     $out = [];
-    exec('netstat -ano | findstr ":' . $port . ' " | findstr LISTENING', $out);
+    // /C: keeps the trailing space literal — without it findstr splits on spaces
+    // and ":80 " becomes ":80", which falsely matches Mailpit :8025.
+    exec('netstat -ano | findstr /C:":' . $port . ' " | findstr LISTENING', $out);
     return $out !== [];
 }
 
@@ -209,7 +211,7 @@ function default_php_version(): string
 function pids_on_port(int $port): array
 {
     $out = [];
-    exec('netstat -ano | findstr ":' . $port . ' " | findstr LISTENING', $out);
+    exec('netstat -ano | findstr /C:":' . $port . ' " | findstr LISTENING', $out);
     $pids = [];
     foreach ($out as $line) {
         if (preg_match('/\s(\d+)\s*$/', $line, $m)) {
@@ -354,7 +356,7 @@ function restart_apache_process(bool $deferred = false): array
     }
     run_cmd('taskkill /F /IM httpd.exe');
     usleep(700000);
-    start_hidden('"' . str_replace('/', '\\', APACHE_BIN) . '"');
+    start_hidden('wscript //B //Nologo "' . str_replace('/', '\\', WEB_ROOT) . '\start-httpd-silent.vbs"');
     usleep(900000);
     return ['ok' => true, 'message' => 'Apache restarted', 'detail' => $check['output']];
 }

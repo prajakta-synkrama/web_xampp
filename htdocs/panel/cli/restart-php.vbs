@@ -22,7 +22,7 @@ Select Case ver
 End Select
 
 ' Kill listeners on the port
-out = sh.Exec("cmd /c netstat -ano | findstr "":" & port & " "" | findstr LISTENING").StdOut.ReadAll
+out = sh.Exec("cmd /c netstat -ano | findstr /C:"":" & port & " "" | findstr LISTENING").StdOut.ReadAll
 Dim lines, i, parts
 lines = Split(out, vbCrLf)
 For i = 0 To UBound(lines)

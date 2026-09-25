@@ -74,7 +74,7 @@ try {
             if (!$check['ok'] && stripos($check['output'], 'Syntax OK') === false) {
                 json_out(['ok' => false, 'message' => 'Config invalid', 'detail' => $check['output']], 400);
             }
-            start_hidden('"' . str_replace('/', '\\', APACHE_BIN) . '"');
+            start_hidden('wscript //B //Nologo "' . str_replace('/', '\\', WEB_ROOT) . '\start-httpd-silent.vbs"');
             usleep(900000);
             json_out(['ok' => true, 'message' => 'Apache started', 'data' => service_status()]);
 

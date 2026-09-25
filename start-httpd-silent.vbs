@@ -1,9 +1,11 @@
 ' Start Apache httpd with no console window.
 Option Explicit
-Dim WshShell, fso, httpd
+Dim WshShell, fso, httpd, web
 Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
-httpd = "C:\web\Apache24\bin\httpd.exe"
+web = "C:\web"
+httpd = web & "\Apache24\bin\httpd.exe"
 If fso.FileExists(httpd) Then
-  WshShell.Run """" & httpd & """", 0, False
+  ' -d ServerRoot so conf/modules resolve when launched from Startup
+  WshShell.Run """" & httpd & """ -d """ & web & "\Apache24""", 0, False
 End If

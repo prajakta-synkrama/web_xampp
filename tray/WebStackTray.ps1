@@ -91,9 +91,14 @@ function Stop-Apache {
 
 function Start-Apache {
   if (Test-Port 80) { return }
+  $vbs = Join-Path $WebRoot 'start-httpd-silent.vbs'
+  if (Test-Path $vbs) {
+    Start-Process -FilePath 'wscript.exe' -ArgumentList @('//B', '//Nologo', "`"$vbs`"") -WindowStyle Hidden
+    return
+  }
   $httpd = Join-Path $WebRoot 'Apache24\bin\httpd.exe'
   if (Test-Path $httpd) {
-    Start-Hidden "`"$httpd`""
+    Start-Hidden "`"$httpd`" -d `"$WebRoot\Apache24`""
   }
 }
 
@@ -225,9 +230,14 @@ $timer.Interval = 5000
 $timer.add_Tick({ Update-Tray })
 $timer.Start()
 
-# Ensure stack is up when tray starts (silent)
+# Ensure stack is up when tray starts (silent). Wait long enough for
+# start-stack-silent.vbs Apache retries after login.
 Start-StackSilent
-Start-Sleep -Milliseconds 500
+Start-Sleep -Seconds 3
+if (-not (Test-Port 80)) {
+  Start-Apache
+  Start-Sleep -Seconds 2
+}
 Update-Tray
 
 $notify.ShowBalloonTip(2500, 'Web Stack', 'Tray is running. Right-click the icon for Start/Stop.', [System.Windows.Forms.ToolTipIcon]::Info)

@@ -20,6 +20,7 @@ End Sub
 
 Function IsListening(port)
   Dim rc
-  rc = WshShell.Run("cmd /c netstat -ano | findstr "":" & port & " "" | findstr LISTENING >nul", 0, True)
+  ' /C: = literal phrase (avoids ":80 " matching Mailpit :8025)
+  rc = WshShell.Run("cmd /c netstat -ano | findstr /C:"":" & port & " "" | findstr LISTENING >nul", 0, True)
   IsListening = (rc = 0)
 End Function
