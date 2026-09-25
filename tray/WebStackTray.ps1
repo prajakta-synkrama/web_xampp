@@ -168,12 +168,12 @@ $statusItem = Add-MenuItem 'Status: …' $null
 $statusItem.Enabled = $false
 
 Add-Separator
-Add-MenuItem 'PHP 7.4 — Start' { Start-PhpVersion '7.4'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
-$stop74 = Add-MenuItem 'PHP 7.4 — Stop' { Stop-PhpVersion '7.4'; Update-Tray }
-Add-MenuItem 'PHP 8.0 — Start' { Start-PhpVersion '8.0'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
-$stop80 = Add-MenuItem 'PHP 8.0 — Stop' { Stop-PhpVersion '8.0'; Update-Tray }
-Add-MenuItem 'PHP 8.4 — Start' { Start-PhpVersion '8.4'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
-$stop84 = Add-MenuItem 'PHP 8.4 — Stop' { Stop-PhpVersion '8.4'; Update-Tray }
+Add-MenuItem 'PHP 7.4 - Start' { Start-PhpVersion '7.4'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
+$stop74 = Add-MenuItem 'PHP 7.4 - Stop' { Stop-PhpVersion '7.4'; Update-Tray }
+Add-MenuItem 'PHP 8.0 - Start' { Start-PhpVersion '8.0'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
+$stop80 = Add-MenuItem 'PHP 8.0 - Stop' { Stop-PhpVersion '8.0'; Update-Tray }
+Add-MenuItem 'PHP 8.4 - Start' { Start-PhpVersion '8.4'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
+$stop84 = Add-MenuItem 'PHP 8.4 - Stop' { Stop-PhpVersion '8.4'; Update-Tray }
 
 Add-Separator
 Add-MenuItem 'Exit tray' {
@@ -195,9 +195,9 @@ function Update-Tray {
   $stop74.Enabled = ($default -ne '7.4')
   $stop80.Enabled = ($default -ne '8.0')
   $stop84.Enabled = ($default -ne '8.4')
-  if ($default -eq '7.4') { $stop74.Text = 'PHP 7.4 — Stop (default)' } else { $stop74.Text = 'PHP 7.4 — Stop' }
-  if ($default -eq '8.0') { $stop80.Text = 'PHP 8.0 — Stop (default)' } else { $stop80.Text = 'PHP 8.0 — Stop' }
-  if ($default -eq '8.4') { $stop84.Text = 'PHP 8.4 — Stop (default)' } else { $stop84.Text = 'PHP 8.4 — Stop' }
+  if ($default -eq '7.4') { $stop74.Text = 'PHP 7.4 - Stop (default)' } else { $stop74.Text = 'PHP 7.4 - Stop' }
+  if ($default -eq '8.0') { $stop80.Text = 'PHP 8.0 - Stop (default)' } else { $stop80.Text = 'PHP 8.0 - Stop' }
+  if ($default -eq '8.4') { $stop84.Text = 'PHP 8.4 - Stop (default)' } else { $stop84.Text = 'PHP 8.4 - Stop' }
 }
 
 $timer = New-Object System.Windows.Forms.Timer
