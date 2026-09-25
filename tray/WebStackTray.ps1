@@ -1,0 +1,216 @@
+# Web Stack system tray (XAMPP-style). Run hidden via start-tray-silent.vbs
+# Requires STA: powershell -STA -WindowStyle Hidden -File this.ps1
+
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$ErrorActionPreference = 'SilentlyContinue'
+$WebRoot = 'C:\web'
+$PanelUrl = 'http://localhost/panel/'
+$MutexName = 'Local\WebStackTrayMutex'
+
+$mutex = New-Object System.Threading.Mutex($false, $MutexName)
+if (-not $mutex.WaitOne(0, $false)) {
+  [System.Windows.Forms.MessageBox]::Show('Web Stack Tray is already running.', 'Web Stack') | Out-Null
+  exit 0
+}
+
+function Test-Port([int]$Port) {
+  $out = & netstat -ano 2>$null | Select-String ":$Port " | Select-String 'LISTENING'
+  return $null -ne $out
+}
+
+function Get-DefaultPhp {
+  $settings = Join-Path $WebRoot 'htdocs\panel\data\settings.json'
+  $ver = '8.4'
+  if (Test-Path $settings) {
+    try {
+      $j = Get-Content $settings -Raw | ConvertFrom-Json
+      if ($j.default_php) { $ver = [string]$j.default_php }
+    } catch {}
+  }
+  return $ver
+}
+
+function Start-Hidden([string]$Command) {
+  $vbs = Join-Path $WebRoot 'run-hidden.vbs'
+  if (Test-Path $vbs) {
+    Start-Process -FilePath 'wscript.exe' -ArgumentList @('//B', '//Nologo', "`"$vbs`"", "`"$Command`"") -WindowStyle Hidden
+  } else {
+    Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', $Command) -WindowStyle Hidden
+  }
+}
+
+function Start-StackSilent {
+  $vbs = Join-Path $WebRoot 'start-stack-silent.vbs'
+  if (Test-Path $vbs) {
+    Start-Process -FilePath 'wscript.exe' -ArgumentList @('//B', '//Nologo', "`"$vbs`"") -WindowStyle Hidden
+  }
+}
+
+function Start-PhpVersion([string]$Version) {
+  $map = @{
+    '7.4' = @{ Dir = 'C:\web\php7.4.33'; Port = 9074 }
+    '8.0' = @{ Dir = 'C:\web\php8.0.30'; Port = 9080 }
+    '8.4' = @{ Dir = 'C:\web\php8.4.26'; Port = 9084 }
+  }
+  if (-not $map.ContainsKey($Version)) { return }
+  $m = $map[$Version]
+  if (Test-Port $m.Port) { return }
+  $cmd = "cmd /c set PHPRC=$($m.Dir)&& `"$($m.Dir)\php-cgi.exe`" -b 127.0.0.1:$($m.Port) -c `"$($m.Dir)`""
+  Start-Hidden $cmd
+}
+
+function Stop-PhpVersion([string]$Version, [switch]$ForceDefault) {
+  $default = Get-DefaultPhp
+  if (-not $ForceDefault -and $Version -eq $default) {
+    [System.Windows.Forms.MessageBox]::Show("Cannot stop default PHP $Version (used by localhost).", 'Web Stack') | Out-Null
+    return
+  }
+  $ports = @{ '7.4' = 9074; '8.0' = 9080; '8.4' = 9084 }
+  $port = $ports[$Version]
+  if (-not $port) { return }
+  $lines = & netstat -ano 2>$null | Select-String ":$port " | Select-String 'LISTENING'
+  foreach ($line in $lines) {
+    if ($line -match '\s(\d+)\s*$') {
+      Start-Process -FilePath 'taskkill.exe' -ArgumentList @('/F', '/PID', $Matches[1]) -WindowStyle Hidden -Wait
+    }
+  }
+}
+
+function Stop-PhpOthers {
+  $default = Get-DefaultPhp
+  foreach ($v in @('7.4', '8.0', '8.4')) {
+    if ($v -ne $default) { Stop-PhpVersion $v -ForceDefault }
+  }
+}
+
+function Stop-Apache {
+  Start-Process -FilePath 'taskkill.exe' -ArgumentList @('/F', '/IM', 'httpd.exe') -WindowStyle Hidden -Wait
+}
+
+function Start-Apache {
+  if (Test-Port 80) { return }
+  $httpd = Join-Path $WebRoot 'Apache24\bin\httpd.exe'
+  if (Test-Path $httpd) {
+    Start-Hidden "`"$httpd`""
+  }
+}
+
+function Get-StatusText {
+  $parts = @()
+  $parts += if (Test-Port 80) { 'Apache: ON' } else { 'Apache: OFF' }
+  $parts += if (Test-Port 9074) { '7.4:ON' } else { '7.4:OFF' }
+  $parts += if (Test-Port 9080) { '8.0:ON' } else { '8.0:OFF' }
+  $parts += if (Test-Port 9084) { '8.4:ON' } else { '8.4:OFF' }
+  $parts += 'default ' + (Get-DefaultPhp)
+  return ($parts -join ' | ')
+}
+
+function New-TrayIcon {
+  $bmp = New-Object System.Drawing.Bitmap 32, 32
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+  $g.Clear([System.Drawing.Color]::FromArgb(0, 0, 0, 0))
+  $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 32, 160, 110))
+  $g.FillEllipse($brush, 2, 2, 28, 28)
+  $font = New-Object System.Drawing.Font 'Segoe UI', 11, ([System.Drawing.FontStyle]::Bold)
+  $tbrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
+  $g.DrawString('W', $font, $tbrush, 7, 6)
+  $g.Dispose()
+  $icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
+  return $icon
+}
+
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'Web Stack Tray'
+$form.ShowInTaskbar = $false
+$form.WindowState = 'Minimized'
+$form.Visible = $false
+$form.Opacity = 0
+
+$notify = New-Object System.Windows.Forms.NotifyIcon
+$notify.Icon = New-TrayIcon
+$notify.Text = 'Web Stack'
+$notify.Visible = $true
+
+$menu = New-Object System.Windows.Forms.ContextMenuStrip
+
+function Add-MenuItem([string]$Text, $Action) {
+  $item = New-Object System.Windows.Forms.ToolStripMenuItem $Text
+  if ($null -ne $Action) {
+    $item.add_Click($Action)
+  }
+  [void]$menu.Items.Add($item)
+  return $item
+}
+
+function Add-Separator {
+  [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+}
+
+Add-MenuItem 'Open Stack Panel' { Start-Process $PanelUrl } | Out-Null
+Add-MenuItem 'Open localhost' { Start-Process 'http://localhost/' } | Out-Null
+Add-Separator
+Add-MenuItem 'Start All (Apache + PHP)' { Start-StackSilent; Start-Sleep -Seconds 1; Update-Tray } | Out-Null
+Add-MenuItem 'Stop PHP (keep default)' { Stop-PhpOthers; Update-Tray } | Out-Null
+Add-MenuItem 'Stop Apache' { Stop-Apache; Update-Tray } | Out-Null
+Add-MenuItem 'Restart Apache' {
+  Stop-Apache
+  Start-Sleep -Milliseconds 800
+  Start-Apache
+  Start-Sleep -Seconds 1
+  Update-Tray
+} | Out-Null
+Add-Separator
+
+$statusItem = Add-MenuItem 'Status: …' $null
+$statusItem.Enabled = $false
+
+Add-Separator
+Add-MenuItem 'PHP 7.4 — Start' { Start-PhpVersion '7.4'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
+$stop74 = Add-MenuItem 'PHP 7.4 — Stop' { Stop-PhpVersion '7.4'; Update-Tray }
+Add-MenuItem 'PHP 8.0 — Start' { Start-PhpVersion '8.0'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
+$stop80 = Add-MenuItem 'PHP 8.0 — Stop' { Stop-PhpVersion '8.0'; Update-Tray }
+Add-MenuItem 'PHP 8.4 — Start' { Start-PhpVersion '8.4'; Start-Sleep -Milliseconds 600; Update-Tray } | Out-Null
+$stop84 = Add-MenuItem 'PHP 8.4 — Stop' { Stop-PhpVersion '8.4'; Update-Tray }
+
+Add-Separator
+Add-MenuItem 'Exit tray' {
+  $timer.Stop()
+  $notify.Visible = $false
+  $notify.Dispose()
+  [System.Windows.Forms.Application]::Exit()
+} | Out-Null
+
+$notify.ContextMenuStrip = $menu
+$notify.add_DoubleClick({ Start-Process $PanelUrl })
+
+function Update-Tray {
+  $text = Get-StatusText
+  if ($text.Length -gt 63) { $text = $text.Substring(0, 63) }
+  $notify.Text = $text
+  $statusItem.Text = Get-StatusText
+  $default = Get-DefaultPhp
+  $stop74.Enabled = ($default -ne '7.4')
+  $stop80.Enabled = ($default -ne '8.0')
+  $stop84.Enabled = ($default -ne '8.4')
+  if ($default -eq '7.4') { $stop74.Text = 'PHP 7.4 — Stop (default)' } else { $stop74.Text = 'PHP 7.4 — Stop' }
+  if ($default -eq '8.0') { $stop80.Text = 'PHP 8.0 — Stop (default)' } else { $stop80.Text = 'PHP 8.0 — Stop' }
+  if ($default -eq '8.4') { $stop84.Text = 'PHP 8.4 — Stop (default)' } else { $stop84.Text = 'PHP 8.4 — Stop' }
+}
+
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 5000
+$timer.add_Tick({ Update-Tray })
+$timer.Start()
+
+# Ensure stack is up when tray starts (silent)
+Start-StackSilent
+Start-Sleep -Milliseconds 500
+Update-Tray
+
+$notify.ShowBalloonTip(2500, 'Web Stack', 'Tray is running. Right-click the icon for Start/Stop.', [System.Windows.Forms.ToolTipIcon]::Info)
+
+[System.Windows.Forms.Application]::Run()
+$mutex.ReleaseMutex() | Out-Null

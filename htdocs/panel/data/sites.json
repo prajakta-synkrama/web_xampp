@@ -1,0 +1,15 @@
+[
+    {
+        "id": "local",
+        "name": "Local",
+        "domain": "local",
+        "aliases": [
+            "local.host"
+        ],
+        "root": "C:/web/htdocs/local",
+        "php": "7.4",
+        "enabled": true,
+        "updated": "2026-09-25T14:38:40+05:30",
+        "created": "2026-09-25T14:38:40+05:30"
+    }
+]
