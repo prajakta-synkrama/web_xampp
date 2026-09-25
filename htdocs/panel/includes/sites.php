@@ -223,12 +223,15 @@ function render_site_vhost(array $site): string
 <VirtualHost *:80>
     ServerName {$domain}{$aliasLine}
     DocumentRoot "{$root}"
+    RewriteEngine On
+    RewriteRule ^/(.*\\.php)/(.*)\$ /\$1?/\$2 [NE,L,QSA]
     <Directory "{$root}">
         Options Indexes FollowSymLinks
         AllowOverride All
         Require all granted
         DirectoryIndex index.php index.html
-        <FilesMatch "\.php$">
+        AcceptPathInfo On
+        <FilesMatch "\\.php\$">
             SetHandler "proxy:fcgi://127.0.0.1:{$port}/"
         </FilesMatch>
     </Directory>
