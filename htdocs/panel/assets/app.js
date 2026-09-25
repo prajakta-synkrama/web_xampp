@@ -74,73 +74,229 @@ function setBusy(btn, busy) {
   }
 }
 
-function pill(up) {
-  return `<span class="pill ${up ? 'up' : 'down'}">${up ? 'Running' : 'Stopped'}</span>`;
+function pill(up, labelOn = 'Running', labelOff = 'Stopped') {
+  return `<span class="pill ${up ? 'up' : 'down'}">${up ? labelOn : labelOff}</span>`;
+}
+
+function overviewHealth(s) {
+  const phpEntries = Object.values(s.php || {});
+  const phpUp = phpEntries.filter(p => p.up).length;
+  const phpTotal = phpEntries.length;
+  const checks = [
+    { key: 'apache', ok: !!s.apache?.up, label: 'Apache' },
+    { key: 'mysql', ok: !!s.mysql?.up, label: 'MySQL', optional: true },
+    { key: 'mail', ok: !!s.mail?.up, label: 'Mail', optional: !s.mail?.installed },
+    { key: 'php', ok: phpUp > 0, label: `PHP ${phpUp}/${phpTotal}` },
+  ];
+  const requiredDown = checks.filter(c => !c.optional && !c.ok);
+  const optionalDown = checks.filter(c => c.optional && !c.ok);
+  let tone = 'ok';
+  let title = 'Everything looks good';
+  let sub = checks.map(c => `${c.label}: ${c.ok ? 'on' : 'off'}`).join(' · ');
+  if (requiredDown.length) {
+    tone = 'bad';
+    title = requiredDown.map(c => c.label).join(', ') + ' stopped';
+    sub = 'Start the services below, then refresh.';
+  } else if (optionalDown.length || phpUp < phpTotal) {
+    tone = 'warn';
+    const bits = [];
+    if (phpUp < phpTotal) bits.push(`${phpTotal - phpUp} PHP version(s) idle`);
+    optionalDown.forEach(c => bits.push(`${c.label} off`));
+    title = 'Stack usable — some parts idle';
+    sub = bits.join(' · ');
+  }
+  return { tone, title, sub, requiredDown, phpUp, phpTotal };
 }
 
 function renderStatus() {
   const s = state.status;
   if (!s) return;
 
-  $('#stat-apache').innerHTML = `
-    <div class="label">Apache</div>
-    <div class="value">${pill(s.apache.up)}</div>
-    <div class="sub">port ${s.apache.port}</div>`;
+  const health = overviewHealth(s);
+  const healthEl = $('#ov-health');
+  const dot = $('#ov-health-dot');
+  if (healthEl) {
+    healthEl.dataset.tone = health.tone;
+    $('#ov-health-title').textContent = health.title;
+    $('#ov-health-sub').textContent = health.sub;
+    if (dot) dot.dataset.tone = health.tone;
+  }
 
-  $('#stat-mysql').innerHTML = `
-    <div class="label">MySQL</div>
-    <div class="value">${pill(s.mysql.up)}</div>
-    <div class="sub">${s.mysql.version ? 'v' + s.mysql.version : 'root@' + s.mysql.port}</div>`;
-
-  const mail = s.mail || {};
-  $('#stat-mail').innerHTML = `
-    <div class="label">Mail (Mailpit)</div>
-    <div class="value">${mail.installed === false ? '<span class="pill down">Missing</span>' : pill(!!mail.up)}</div>
-    <div class="sub">SMTP :${mail.smtp_port || 1025} · <a href="${escapeAttr(mail.ui_url || 'http://127.0.0.1:8025/')}" target="_blank" rel="noopener">inbox</a></div>`;
-
-  $('#stat-runtime').innerHTML = `
-    <div class="label">This request</div>
-    <div class="value">PHP ${s.runtime.php}</div>
-    <div class="sub">${s.runtime.sapi} · ${s.runtime.host}</div>`;
+  const startNeeded = $('#ov-start-needed');
+  if (startNeeded) {
+    const needApache = !s.apache?.up;
+    const needMail = s.mail?.installed !== false && !s.mail?.up;
+    const needPhp = Object.values(s.php || {}).some(p => !p.up);
+    const show = needApache || needMail || needPhp;
+    startNeeded.hidden = !show;
+    startNeeded.textContent = 'Start stopped services';
+    startNeeded.onclick = async () => {
+      try {
+        setBusy(startNeeded, true);
+        if (needApache) await api('start_apache');
+        if (needMail) await api('start_mail');
+        if (needPhp) await api('start_php');
+        await refreshStatus();
+        toast('Stopped services started');
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        setBusy(startNeeded, false);
+      }
+    };
+  }
 
   if ($('#default-php-select') && s.default_php) {
     $('#default-php-select').value = s.default_php;
   }
 
-  const localhostHosts = (s.localhost_domains || ['localhost', 'latest', 'localhost.latest'])
-    .map(h => `<a href="http://${h}/" target="_blank" rel="noopener">${h}<small>default PHP ${s.default_php}</small></a>`)
-    .join('');
+  const mail = s.mail || {};
+  const services = [
+    {
+      id: 'apache',
+      name: 'Apache',
+      desc: 'Web server for your sites',
+      up: !!s.apache?.up,
+      detail: `Port ${s.apache?.port || 80}`,
+      actions: s.apache?.up
+        ? [
+            { action: 'restart_apache', label: 'Restart', className: 'warn' },
+            { action: 'stop_apache', label: 'Stop', className: 'danger' },
+          ]
+        : [{ action: 'start_apache', label: 'Start', className: 'primary' }],
+      links: [{ href: 'http://localhost/', label: 'Open localhost' }],
+    },
+    {
+      id: 'mysql',
+      name: 'MySQL',
+      desc: 'Database (phpMyAdmin / panel SQL)',
+      up: !!s.mysql?.up,
+      detail: s.mysql?.up
+        ? (s.mysql.version ? `v${s.mysql.version} · :${s.mysql.port}` : `root@:${s.mysql.port}`)
+        : `Not detected on :${s.mysql?.port || 3306}`,
+      actions: [],
+      links: s.mysql?.up
+        ? [{ href: 'http://localhost/phpmyadmin/', label: 'phpMyAdmin' }]
+        : [],
+      note: s.mysql?.up ? '' : 'Start MySQL/MariaDB separately if you need the database.',
+    },
+    {
+      id: 'mail',
+      name: 'Mailpit',
+      desc: 'Catches PHP mail locally',
+      up: !!mail.up,
+      detail: mail.installed === false
+        ? 'Not installed (C:/web/mailpit)'
+        : `SMTP :${mail.smtp_port || 1025} · UI :${mail.ui_port || 8025}`,
+      actions: mail.installed === false
+        ? []
+        : mail.up
+          ? [{ action: 'stop_mail', label: 'Stop', className: 'danger' }]
+          : [{ action: 'start_mail', label: 'Start', className: 'primary' }],
+      links: mail.installed === false
+        ? []
+        : [{ href: mail.ui_url || 'http://127.0.0.1:8025/', label: 'Open inbox' }],
+    },
+  ];
 
-  const phpCards = Object.entries(s.php).map(([key, p]) => {
+  const svcEl = $('#ov-services');
+  if (svcEl) {
+    svcEl.innerHTML = services.map(svc => `
+      <div class="ov-service ${svc.up ? 'is-up' : 'is-down'}">
+        <div class="ov-service-status" aria-hidden="true"></div>
+        <div class="ov-service-body">
+          <div class="ov-service-top">
+            <div>
+              <div class="ov-service-name">${escapeHtml(svc.name)} ${pill(svc.up)}</div>
+              <div class="ov-service-desc">${escapeHtml(svc.desc)}</div>
+            </div>
+            <div class="ov-service-detail">${escapeHtml(svc.detail)}</div>
+          </div>
+          ${svc.note ? `<p class="ov-service-note">${escapeHtml(svc.note)}</p>` : ''}
+          <div class="ov-service-actions">
+            ${svc.actions.map(a =>
+              `<button class="btn ${a.className || ''}" type="button" data-action="${escapeAttr(a.action)}">${escapeHtml(a.label)}</button>`
+            ).join('')}
+            ${svc.links.map(l =>
+              `<a class="btn" href="${escapeAttr(l.href)}" target="_blank" rel="noopener">${escapeHtml(l.label)}</a>`
+            ).join('')}
+          </div>
+        </div>
+      </div>
+    `).join('');
+    svcEl.querySelectorAll('[data-action]').forEach(b => {
+      b.addEventListener('click', () => runAction(b.dataset.action, b));
+    });
+  }
+
+  const phpCards = Object.entries(s.php || {}).map(([key, p]) => {
     const stopDisabled = p.is_default ? 'disabled title="Default PHP for localhost — cannot stop"' : '';
+    const hosts = [
+      ...(p.is_default ? (s.localhost_domains || []).map(h => ({ host: h, tip: 'localhost default' })) : []),
+      ...p.hosts.map(h => ({ host: h, tip: p.label })),
+    ];
     return `
-    <div class="card">
-      <div class="row-between">
-        <h3>${p.label}${p.is_default ? ' <span class="pill up">default</span>' : ''}</h3>
-        ${pill(p.up)}
+    <div class="ov-php ${p.up ? 'is-up' : 'is-down'}${p.is_default ? ' is-default' : ''}">
+      <div class="ov-php-head">
+        <div>
+          <div class="ov-php-title">
+            ${escapeHtml(p.label)}
+            ${p.is_default ? '<span class="pill up">default</span>' : ''}
+            ${pill(p.up)}
+          </div>
+          <div class="ov-php-meta">FastCGI :${p.port}${p.is_default ? ' · serves localhost' : ''}</div>
+        </div>
+        <div class="btn-row">
+          ${p.up
+            ? `<button class="btn danger" type="button" data-php-stop="${escapeAttr(key)}" ${stopDisabled}>Stop</button>`
+            : `<button class="btn primary" type="button" data-php-start="${escapeAttr(key)}">Start</button>`}
+        </div>
       </div>
-      <div class="meta">FastCGI :${p.port}${p.is_default ? ' · serves localhost' : ''}</div>
-      <div class="btn-row" style="margin-top:10px">
-        <button class="btn" type="button" data-php-start="${escapeAttr(key)}">Start</button>
-        <button class="btn danger" type="button" data-php-stop="${escapeAttr(key)}" ${stopDisabled}>Stop</button>
-      </div>
-      <div class="link-list" style="margin-top:10px">
-        ${p.is_default ? localhostHosts : ''}
-        ${p.hosts.map(h => `<a href="http://${h}/" target="_blank" rel="noopener">${h}<small>http://${h}/</small></a>`).join('')}
+      <div class="ov-php-hosts">
+        ${hosts.map(h =>
+          `<a href="http://${escapeAttr(h.host)}/" target="_blank" rel="noopener">${escapeHtml(h.host)}</a>`
+        ).join('') || '<span class="muted">No hosts</span>'}
       </div>
     </div>`;
   }).join('');
-  $('#php-cards').innerHTML = phpCards;
-  $$('#php-cards [data-php-start]').forEach(b => b.addEventListener('click', () => phpVersionAction('start_php_version', b.dataset.phpStart, b)));
-  $$('#php-cards [data-php-stop]').forEach(b => b.addEventListener('click', () => phpVersionAction('stop_php_version', b.dataset.phpStop, b)));
+  const phpEl = $('#php-cards');
+  if (phpEl) {
+    phpEl.innerHTML = phpCards;
+    $$('#php-cards [data-php-start]').forEach(b =>
+      b.addEventListener('click', () => phpVersionAction('start_php_version', b.dataset.phpStart, b)));
+    $$('#php-cards [data-php-stop]').forEach(b =>
+      b.addEventListener('click', () => phpVersionAction('stop_php_version', b.dataset.phpStop, b)));
+  }
+
+  const tools = [
+    { href: 'http://localhost/', label: 'localhost', tip: `PHP ${s.default_php}` },
+    { href: mail.ui_url || 'http://127.0.0.1:8025/', label: 'Mail inbox', tip: 'Mailpit' },
+    { href: 'http://localhost/mail-test/', label: 'Mail test', tip: 'Send a sample' },
+    { href: 'http://localhost/phpmyadmin/', label: 'phpMyAdmin', tip: s.mysql?.up ? 'Database UI' : 'MySQL offline' },
+  ];
+  const toolsEl = $('#ov-tools');
+  if (toolsEl) {
+    toolsEl.innerHTML = tools.map(t =>
+      `<a class="ov-tool" href="${escapeAttr(t.href)}" target="_blank" rel="noopener">
+        <strong>${escapeHtml(t.label)}</strong>
+        <span>${escapeHtml(t.tip)}</span>
+      </a>`
+    ).join('');
+  }
 
   const allHosts = [
-    ...(s.localhost_domains || []).map(h => ({ host: h, label: 'default ' + s.default_php })),
-    ...Object.values(s.php).flatMap(p => p.hosts.map(h => ({ host: h, label: p.label }))),
+    ...(s.localhost_domains || []).map(h => ({ host: h, label: `default PHP ${s.default_php}` })),
+    ...Object.values(s.php || {}).flatMap(p => p.hosts.map(h => ({ host: h, label: p.label }))),
   ];
-  $('#site-links').innerHTML = allHosts.map(x =>
-    `<a href="http://${x.host}/" target="_blank" rel="noopener">${x.host}<small>${x.label}</small></a>`
-  ).join('');
+  const sitesEl = $('#site-links');
+  if (sitesEl) {
+    sitesEl.innerHTML = allHosts.map(x =>
+      `<a class="ov-site" href="http://${escapeAttr(x.host)}/" target="_blank" rel="noopener">
+        <strong>${escapeHtml(x.host)}</strong>
+        <span>${escapeHtml(x.label)}</span>
+      </a>`
+    ).join('');
+  }
 }
 
 async function phpVersionAction(action, version, btn) {
@@ -209,7 +365,7 @@ function showView(name) {
   $$('.nav button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
   $$('.section').forEach(s => s.classList.toggle('active', s.id === 'view-' + name));
   const titles = {
-    overview: ['Stack overview', 'Live status, restarts, and quick links'],
+        overview: ['Overview', 'See what’s running and start what you need'],
     sites: ['Sites', 'Add domains, local folders, and PHP versions'],
     php: ['PHP Config', 'Friendly php.ini controls — errors, limits, toggles'],
     config: ['Configuration editor', 'Edit Apache and PHP ini files'],
@@ -1014,7 +1170,7 @@ function bind() {
     $('#toggle-raw-logs').textContent = state.logs.raw ? 'Table' : 'Raw';
   });
   $('#run-sql').addEventListener('click', () => runQuery($('#run-sql')));
-  $('#refresh-status').addEventListener('click', async (e) => {
+  const onRefresh = async (e) => {
     try {
       setBusy(e.currentTarget, true);
       await refreshStatus();
@@ -1024,7 +1180,9 @@ function bind() {
     } finally {
       setBusy(e.currentTarget, false);
     }
-  });
+  };
+  $('#refresh-status')?.addEventListener('click', onRefresh);
+  $('#refresh-status-ov')?.addEventListener('click', onRefresh);
 
   // PHP Config
   $$('[data-php-mode]').forEach(b => b.addEventListener('click', () => setPhpMode(b.dataset.phpMode)));

@@ -10,7 +10,7 @@ require __DIR__ . '/includes/bootstrap.php';
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/app.css?v=10">
+  <link rel="stylesheet" href="assets/app.css?v=11">
 </head>
 <body>
   <div class="app">
@@ -41,47 +41,75 @@ require __DIR__ . '/includes/bootstrap.php';
       </div>
 
       <section class="section active" id="view-overview">
-        <div class="grid stats">
-          <div class="card stat" id="stat-apache"></div>
-          <div class="card stat" id="stat-mysql"></div>
-          <div class="card stat" id="stat-mail"></div>
-          <div class="card stat" id="stat-runtime"></div>
-          <div class="card stat">
-            <div class="label">Controls</div>
-            <div class="btn-row" style="margin-top:12px">
-              <button class="btn primary" type="button" data-action="restart_all">Restart all</button>
-              <button class="btn warn" type="button" data-action="restart_apache">Restart Apache</button>
+        <div class="ov-health" id="ov-health">
+          <div class="ov-health-main">
+            <div class="ov-health-dot" id="ov-health-dot" aria-hidden="true"></div>
+            <div>
+              <div class="ov-health-title" id="ov-health-title">Checking stack…</div>
+              <div class="ov-health-sub" id="ov-health-sub">Apache · PHP · MySQL · Mail</div>
             </div>
-            <div class="btn-row" style="margin-top:8px">
-              <button class="btn" type="button" data-action="start_apache">Start Apache</button>
-              <button class="btn danger" type="button" data-action="stop_apache">Stop Apache</button>
-            </div>
-            <div class="btn-row" style="margin-top:8px">
-              <button class="btn" type="button" data-action="start_php">Start all PHP</button>
-              <button class="btn danger" type="button" data-action="stop_php" title="Keeps default PHP for localhost">Stop others</button>
-            </div>
-            <div class="btn-row" style="margin-top:8px">
-              <button class="btn" type="button" data-action="start_mail">Start Mail</button>
-              <button class="btn danger" type="button" data-action="stop_mail">Stop Mail</button>
-              <a class="btn" href="http://127.0.0.1:8025/" target="_blank" rel="noopener">Open inbox</a>
-            </div>
-            <div class="meta" style="margin-top:10px">Default for localhost</div>
-            <div class="btn-row" style="margin-top:6px">
-              <select id="default-php-select">
-                <option value="7.4">PHP 7.4</option>
-                <option value="8.0">PHP 8.0</option>
-                <option value="8.4" selected>PHP 8.4</option>
-              </select>
-              <button class="btn primary" type="button" id="save-default-php">Apply</button>
-            </div>
+          </div>
+          <div class="btn-row ov-health-actions">
+            <button class="btn primary" type="button" data-action="restart_all" title="Reload Apache, PHP listeners, and Mail">Restart stack</button>
+            <button class="btn" type="button" id="ov-start-needed" hidden>Start stopped</button>
+            <button class="btn" type="button" id="refresh-status-ov">Refresh</button>
           </div>
         </div>
 
-        <div class="grid three" style="margin-top:14px" id="php-cards"></div>
+        <div class="ov-layout">
+          <div class="stack ov-main">
+            <div class="card ov-services-card">
+              <div class="row-between ov-section-head">
+                <div>
+                  <h2>Services</h2>
+                  <p class="muted">Web server, database, and local mail catcher</p>
+                </div>
+              </div>
+              <div class="ov-service-list" id="ov-services"></div>
+            </div>
 
-        <div class="card" style="margin-top:14px">
-          <h2>Quick open</h2>
-          <div class="link-list" id="site-links"></div>
+            <div class="card">
+              <div class="row-between ov-section-head">
+                <div>
+                  <h2>PHP versions</h2>
+                  <p class="muted">Each version runs as FastCGI. Pick which one serves <code>localhost</code>.</p>
+                </div>
+                <div class="ov-default-php">
+                  <label class="ov-default-label" for="default-php-select">Default for localhost</label>
+                  <div class="btn-row">
+                    <select id="default-php-select" aria-label="Default PHP for localhost">
+                      <option value="7.4">PHP 7.4</option>
+                      <option value="8.0">PHP 8.0</option>
+                      <option value="8.4" selected>PHP 8.4</option>
+                    </select>
+                    <button class="btn primary" type="button" id="save-default-php">Apply</button>
+                  </div>
+                </div>
+              </div>
+              <div class="ov-php-list" id="php-cards"></div>
+            </div>
+          </div>
+
+          <aside class="stack ov-side">
+            <div class="card">
+              <h2>Open</h2>
+              <p class="muted">Common tools</p>
+              <div class="ov-tool-list" id="ov-tools"></div>
+            </div>
+            <div class="card">
+              <h2>Sites</h2>
+              <p class="muted">Built-in hosts</p>
+              <div class="ov-site-list" id="site-links"></div>
+            </div>
+            <div class="card ov-hint-card">
+              <h2>Tips</h2>
+              <ul class="ov-tips" id="ov-tips">
+                <li>Stopped PHP versions won’t serve their hosts until you start them.</li>
+                <li>Mail from PHP lands in Mailpit — nothing is sent to the internet.</li>
+                <li>Use <strong>Sites</strong> to add custom domains like <code>myapp.test</code>.</li>
+              </ul>
+            </div>
+          </aside>
         </div>
       </section>
 
@@ -429,6 +457,6 @@ require __DIR__ . '/includes/bootstrap.php';
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="assets/app.js?v=10"></script>
+  <script src="assets/app.js?v=11"></script>
 </body>
 </html>

@@ -7,7 +7,8 @@
 # PHP Windows builds
 /php*/
 /php*/**
-
+!/php8.0.30/
+!/php8.0.30/**
 # Local mail catcher binary + DB (keep start scripts at repo root)
 /mailpit/**
 !/mailpit/.gitkeep
