@@ -57,7 +57,7 @@ function Start-PhpVersion([string]$Version) {
   if (-not $map.ContainsKey($Version)) { return }
   $m = $map[$Version]
   if (Test-Port $m.Port) { return }
-  $cmd = "cmd /c set PHPRC=$($m.Dir)&& `"$($m.Dir)\php-cgi.exe`" -b 127.0.0.1:$($m.Port) -c `"$($m.Dir)`""
+  $cmd = "cmd /c set PHPRC=$($m.Dir)&& set PHP_FCGI_CHILDREN=8&& set PHP_FCGI_MAX_REQUESTS=500&& `"$($m.Dir)\php-cgi.exe`" -b 127.0.0.1:$($m.Port) -c `"$($m.Dir)`""
   Start-Hidden $cmd
 }
 

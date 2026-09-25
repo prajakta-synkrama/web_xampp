@@ -31,7 +31,7 @@ Sub StartPhp(phpDir, port)
   exe = phpDir & "\php-cgi.exe"
   If Not fso.FileExists(exe) Then Exit Sub
   If IsListening(port) Then Exit Sub
-  WshShell.Run "cmd /c set PHPRC=" & phpDir & "&& """ & exe & """ -b 127.0.0.1:" & port & " -c """ & phpDir & """", 0, False
+  WshShell.Run "cmd /c set PHPRC=" & phpDir & "&& set PHP_FCGI_CHILDREN=8&& set PHP_FCGI_MAX_REQUESTS=500&& """ & exe & """ -b 127.0.0.1:" & port & " -c """ & phpDir & """", 0, False
 End Sub
 
 Function IsListening(port)

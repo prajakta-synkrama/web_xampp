@@ -238,7 +238,11 @@ function start_php_version(string $version): array
     }
     $dir = str_replace('/', '\\', $meta['dir']);
     $port = $meta['port'];
-    $command = 'cmd /c set PHPRC=' . $dir . '&& "' . $dir . '\php-cgi.exe" -b 127.0.0.1:' . $port . ' -c "' . $dir . '"';
+    // Multiple children: OE (and similar) call their own HTTP API during the same request.
+    $command = 'cmd /c set PHPRC=' . $dir
+        . '&& set PHP_FCGI_CHILDREN=8'
+        . '&& set PHP_FCGI_MAX_REQUESTS=500'
+        . '&& "' . $dir . '\php-cgi.exe" -b 127.0.0.1:' . $port . ' -c "' . $dir . '"';
     start_hidden($command);
     usleep(600000);
     $up = port_listening($port);

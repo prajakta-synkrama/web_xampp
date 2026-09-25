@@ -7,8 +7,12 @@
 # PHP Windows builds
 /php*/
 /php*/**
-!/php8.0.30/
-!/php8.0.30/**
+
+# PHP runtime temp / CodeIgniter sessions (e.g. php8.0.30/tmp/ci_session*)
+/php*/tmp/
+/php*/tmp/**
+**/php*/tmp/ci_session*
+
 # Local mail catcher binary + DB (keep start scripts at repo root)
 /mailpit/**
 !/mailpit/.gitkeep
