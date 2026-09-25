@@ -16,6 +16,20 @@ const state = {
   },
   sites: null,
   editingSiteId: null,
+  phpini: {
+    version: '8.4',
+    mode: 'simple',
+    data: null,
+    levels: {
+      error: true,
+      warning: true,
+      notice: true,
+      deprecated: true,
+      strict: true,
+    },
+    preset: 'development',
+    dirtyExpr: false,
+  },
 };
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -191,6 +205,7 @@ function showView(name) {
   const titles = {
     overview: ['Stack overview', 'Live status, restarts, and quick links'],
     sites: ['Sites', 'Add domains, local folders, and PHP versions'],
+    php: ['PHP Config', 'Friendly php.ini controls — errors, limits, toggles'],
     config: ['Configuration editor', 'Edit Apache and PHP ini files'],
     logs: ['Logs', 'Parsed Apache / PHP logs by version, type, and message'],
     database: ['Database', 'Browse schemas and run SQL like phpMyAdmin'],
@@ -200,6 +215,7 @@ function showView(name) {
   $('#page-sub').textContent = t[1];
 
   if (name === 'config') loadConfig();
+  if (name === 'php') loadPhpIni();
   if (name === 'logs') loadLogs();
   if (name === 'sites') loadSites();
   if (name === 'database') loadDatabases().catch(e => toast(e.message, true));
@@ -749,6 +765,216 @@ async function deleteSite(id, btn) {
   }
 }
 
+const PHPINI_LEVEL_META = {
+  error: { label: 'Error', tone: 'error' },
+  warning: { label: 'Warning', tone: 'warn' },
+  notice: { label: 'Notice', tone: 'notice' },
+  deprecated: { label: 'Deprecated', tone: 'notice' },
+  strict: { label: 'Strict', tone: 'info' },
+};
+
+function setPhpMode(mode) {
+  state.phpini.mode = mode;
+  $$('[data-php-mode]').forEach(b => b.classList.toggle('active', b.dataset.phpMode === mode));
+  const adv = mode === 'advanced';
+  $$('.php-adv-only').forEach(el => el.classList.toggle('hidden', !adv));
+}
+
+function syncPhpLevelUi() {
+  const levels = state.phpini.levels;
+  $$('#phpini-levels .level-chip').forEach(btn => {
+    const on = !!levels[btn.dataset.level];
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+
+  const live = $('#phpini-level-live');
+  if (live) {
+    live.innerHTML = Object.entries(PHPINI_LEVEL_META).map(([key, meta]) => {
+      const on = !!levels[key];
+      return `<span class="level-badge ${on ? meta.tone : 'off'}">${meta.label}${on ? '' : ' off'}</span>`;
+    }).join('');
+  }
+
+  $$('#phpini-presets .preset-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.preset === state.phpini.preset);
+  });
+
+  if (!state.phpini.dirtyExpr && $('#phpini-error_reporting')) {
+    // keep expression field in sync when chips drive it
+  }
+}
+
+function applyPresetToLevels(presetId, presets) {
+  const meta = presets?.[presetId];
+  if (!meta?.levels) return;
+  state.phpini.levels = { ...meta.levels };
+  state.phpini.preset = presetId;
+  state.phpini.dirtyExpr = false;
+  if ($('#phpini-error_reporting')) {
+    $('#phpini-error_reporting').value = meta.expression || '';
+  }
+  syncPhpLevelUi();
+}
+
+function detectPresetFromLevels(presets) {
+  if (!presets) return 'custom';
+  const cur = state.phpini.levels;
+  for (const [id, meta] of Object.entries(presets)) {
+    const lv = meta.levels || {};
+    if (['error', 'warning', 'notice', 'deprecated', 'strict'].every(k => !!lv[k] === !!cur[k])) {
+      return id;
+    }
+  }
+  return 'custom';
+}
+
+function renderPhpIni(data) {
+  state.phpini.data = data;
+  state.phpini.version = data.version;
+  $('#phpini-version').value = data.version;
+  $('#phpini-path').textContent = data.path || '';
+  $('#phpini-hint').textContent = data.restart_hint || '';
+
+  const s = data.settings || {};
+  const boolMap = [
+    'display_errors',
+    'display_startup_errors',
+    'log_errors',
+    'html_errors',
+    'expose_php',
+    'file_uploads',
+    'allow_url_fopen',
+    'short_open_tag',
+  ];
+  boolMap.forEach(key => {
+    const el = $('#phpini-' + key);
+    if (el) el.checked = !!(s[key] && s[key].value);
+  });
+
+  const textMap = {
+    memory_limit: 'phpini-memory_limit',
+    max_execution_time: 'phpini-max_execution_time',
+    post_max_size: 'phpini-post_max_size',
+    upload_max_filesize: 'phpini-upload_max_filesize',
+    'date.timezone': 'phpini-date_timezone',
+    error_log: 'phpini-error_log',
+    error_reporting: 'phpini-error_reporting',
+  };
+  Object.entries(textMap).forEach(([key, id]) => {
+    const el = $('#' + id);
+    if (el) el.value = (s[key] && s[key].value) || '';
+  });
+
+  const eu = data.error_ui || {};
+  state.phpini.levels = {
+    error: true,
+    warning: true,
+    notice: true,
+    deprecated: true,
+    strict: true,
+    ...(eu.levels || {}),
+  };
+  state.phpini.preset = eu.preset || 'custom';
+  state.phpini.dirtyExpr = false;
+
+  const presetsWrap = $('#phpini-presets');
+  const presets = eu.presets || {};
+  presetsWrap.innerHTML = Object.entries(presets).map(([id, p]) => `
+    <button type="button" class="preset-btn ${state.phpini.preset === id ? 'active' : ''}" data-preset="${escapeAttr(id)}">
+      ${escapeHtml(p.label)}
+      <small>${escapeHtml(p.hint || '')}</small>
+    </button>
+  `).join('') + `
+    <button type="button" class="preset-btn ${state.phpini.preset === 'custom' ? 'active' : ''}" data-preset="custom">
+      Custom
+      <small>Pick levels below</small>
+    </button>`;
+
+  presetsWrap.querySelectorAll('[data-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.preset;
+      if (id === 'custom') {
+        state.phpini.preset = 'custom';
+        syncPhpLevelUi();
+        return;
+      }
+      applyPresetToLevels(id, presets);
+    });
+  });
+
+  syncPhpLevelUi();
+  setPhpMode(state.phpini.mode);
+}
+
+async function loadPhpIni() {
+  const version = $('#phpini-version')?.value || state.phpini.version || '8.4';
+  try {
+    const data = await api('phpini_get', { query: { version } });
+    renderPhpIni(data);
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+function collectPhpIniPayload() {
+  const version = $('#phpini-version').value;
+  const payload = {
+    version,
+    display_errors: $('#phpini-display_errors').checked,
+    display_startup_errors: $('#phpini-display_startup_errors').checked,
+    log_errors: $('#phpini-log_errors').checked,
+    html_errors: $('#phpini-html_errors').checked,
+    expose_php: $('#phpini-expose_php').checked,
+    file_uploads: $('#phpini-file_uploads').checked,
+    allow_url_fopen: $('#phpini-allow_url_fopen').checked,
+    short_open_tag: $('#phpini-short_open_tag').checked,
+    memory_limit: $('#phpini-memory_limit').value.trim(),
+    max_execution_time: $('#phpini-max_execution_time').value.trim(),
+    post_max_size: $('#phpini-post_max_size').value.trim(),
+    upload_max_filesize: $('#phpini-upload_max_filesize').value.trim(),
+    'date.timezone': $('#phpini-date_timezone').value.trim(),
+    error_log: $('#phpini-error_log').value.trim(),
+    error_levels: { ...state.phpini.levels },
+  };
+  const expr = ($('#phpini-error_reporting')?.value || '').trim();
+  if (state.phpini.mode === 'advanced' && state.phpini.dirtyExpr && expr) {
+    payload.error_reporting = expr;
+    delete payload.error_levels;
+  }
+  return payload;
+}
+
+async function savePhpIni(btn) {
+  try {
+    setBusy(btn, true);
+    const data = await api('phpini_save', { body: collectPhpIniPayload() });
+    if (data.data) renderPhpIni(data.data);
+    toast((data.message || 'Saved') + (data.restart_hint ? ' · restart PHP to apply' : ''));
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
+async function restartSelectedPhp(btn) {
+  const version = $('#phpini-version').value;
+  try {
+    setBusy(btn, true);
+    const data = await api('phpini_restart', { body: { version }, query: { version } });
+    if (data.data) {
+      state.status = data.data;
+      renderStatus();
+    }
+    toast(data.message || 'PHP restarted');
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
 function bind() {
   $$('.nav button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
   $$('[data-action]').forEach(b => b.addEventListener('click', () => runAction(b.dataset.action, b)));
@@ -793,6 +1019,42 @@ function bind() {
       setBusy(e.currentTarget, false);
     }
   });
+
+  // PHP Config
+  $$('[data-php-mode]').forEach(b => b.addEventListener('click', () => setPhpMode(b.dataset.phpMode)));
+  $('#phpini-version')?.addEventListener('change', () => {
+    state.phpini.version = $('#phpini-version').value;
+    loadPhpIni();
+  });
+  $('#phpini-reload')?.addEventListener('click', loadPhpIni);
+  $('#phpini-save')?.addEventListener('click', () => savePhpIni($('#phpini-save')));
+  $('#phpini-restart')?.addEventListener('click', () => restartSelectedPhp($('#phpini-restart')));
+  $$('#phpini-levels .level-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.level;
+      state.phpini.levels[key] = !state.phpini.levels[key];
+      const presets = state.phpini.data?.error_ui?.presets;
+      state.phpini.preset = detectPresetFromLevels(presets);
+      state.phpini.dirtyExpr = false;
+      // Rebuild expression from chips via save path; preview in field
+      const exprEl = $('#phpini-error_reporting');
+      if (exprEl && presets) {
+        const match = Object.values(presets).find(p => {
+          const lv = p.levels || {};
+          return ['error', 'warning', 'notice', 'deprecated', 'strict']
+            .every(k => !!lv[k] === !!state.phpini.levels[k]);
+        });
+        if (match) exprEl.value = match.expression;
+        else exprEl.value = '(custom levels)';
+      }
+      syncPhpLevelUi();
+    });
+  });
+  $('#phpini-error_reporting')?.addEventListener('input', () => {
+    state.phpini.dirtyExpr = true;
+    state.phpini.preset = 'custom';
+    syncPhpLevelUi();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -800,6 +1062,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   showView('overview');
   try {
     await refreshStatus();
+    if (state.status?.default_php) {
+      state.phpini.version = state.status.default_php;
+      if ($('#phpini-version')) $('#phpini-version').value = state.status.default_php;
+    }
   } catch (e) {
     toast(e.message, true);
   }

@@ -398,6 +398,44 @@ try {
                 'data' => sites_overview(),
             ]);
 
+        case 'phpini_get':
+            $ver = (string)($_GET['version'] ?? '');
+            if ($ver === '') {
+                $ver = default_php_version();
+            }
+            $data = phpini_get($ver);
+            json_out($data, !empty($data['ok']) ? 200 : 400);
+
+        case 'phpini_save':
+            if ($method !== 'POST') {
+                json_out(['ok' => false, 'message' => 'POST required'], 405);
+            }
+            $body = json_decode(file_get_contents('php://input') ?: '{}', true) ?: [];
+            $ver = (string)($body['version'] ?? '');
+            if ($ver === '') {
+                json_out(['ok' => false, 'message' => 'version required'], 400);
+            }
+            $result = phpini_save($ver, $body);
+            json_out($result, !empty($result['ok']) ? 200 : 400);
+
+        case 'phpini_restart':
+            if ($method !== 'POST') {
+                json_out(['ok' => false, 'message' => 'POST required'], 405);
+            }
+            $body = json_decode(file_get_contents('php://input') ?: '{}', true) ?: [];
+            $ver = (string)($body['version'] ?? $_GET['version'] ?? '');
+            if (!isset(PHP_VERSIONS[$ver])) {
+                json_out(['ok' => false, 'message' => 'Unknown PHP version'], 400);
+            }
+            // Defer so this FastCGI response can finish if we are bouncing the serving PHP.
+            $bat = WEB_ROOT . '/restart-php-delayed.bat';
+            start_hidden('cmd /c "' . str_replace('/', '\\', $bat) . '" ' . $ver);
+            json_out([
+                'ok' => true,
+                'message' => PHP_VERSIONS[$ver]['label'] . ' will reload in ~2s with current php.ini',
+                'data' => service_status(),
+            ]);
+
         default:
             json_out(['ok' => false, 'message' => 'Unknown action'], 404);
     }

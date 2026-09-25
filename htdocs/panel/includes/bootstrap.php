@@ -610,4 +610,5 @@ function resolve_log_source(string $source, string $kind): ?array
     ];
 }
 
-require __DIR__ . "/sites.php";
+require __DIR__ . '/sites.php';
+require __DIR__ . '/phpini.php';

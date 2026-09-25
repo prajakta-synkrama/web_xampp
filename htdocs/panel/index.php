@@ -10,7 +10,7 @@ require __DIR__ . '/includes/bootstrap.php';
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/app.css?v=8">
+  <link rel="stylesheet" href="assets/app.css?v=9">
 </head>
 <body>
   <div class="app">
@@ -22,7 +22,8 @@ require __DIR__ . '/includes/bootstrap.php';
       <nav class="nav">
         <button type="button" data-view="overview" class="active">Overview</button>
         <button type="button" data-view="sites">Sites</button>
-        <button type="button" data-view="config">Config editsor</button>
+        <button type="button" data-view="php">PHP Config</button>
+        <button type="button" data-view="config">Config editor</button>
         <button type="button" data-view="logs">Logs</button>
         <button type="button" data-view="database">Database</button>
         <button type="button" onclick="window.open('http://localhost/phpmyadmin/', '_blank')">Phpmyadmin</button>
@@ -142,6 +143,180 @@ require __DIR__ . '/includes/bootstrap.php';
         </div>
       </section>
 
+      <section class="section" id="view-php">
+        <div class="card php-toolbar-card">
+          <div class="toolbar php-toolbar">
+            <div class="php-mode-tabs" role="tablist">
+              <button type="button" class="mode-tab active" data-php-mode="simple">Simple</button>
+              <button type="button" class="mode-tab" data-php-mode="advanced">Advanced</button>
+            </div>
+            <select id="phpini-version" aria-label="PHP version">
+              <option value="7.4">PHP 7.4</option>
+              <option value="8.0">PHP 8.0</option>
+              <option value="8.4">PHP 8.4</option>
+            </select>
+            <button class="btn" type="button" id="phpini-reload">Reload</button>
+            <button class="btn primary" type="button" id="phpini-save">Save php.ini</button>
+            <button class="btn warn" type="button" id="phpini-restart" title="Restart this PHP FastCGI worker">Restart PHP</button>
+          </div>
+          <p class="meta" id="phpini-path">Select a PHP version</p>
+        </div>
+
+        <div class="grid two php-config-grid" style="margin-top:14px">
+          <div class="card">
+            <div class="row-between">
+              <h2>Error display</h2>
+              <div class="level-live" id="phpini-level-live" aria-live="polite"></div>
+            </div>
+            <p class="muted">What visitors and logs see when something goes wrong.</p>
+
+            <div class="toggle-list" id="phpini-toggles-simple">
+              <label class="toggle-row">
+                <span>
+                  <strong>Show errors on page</strong>
+                  <small>display_errors — print errors in the browser</small>
+                </span>
+                <span class="toggle-wrap">
+                  <input type="checkbox" id="phpini-display_errors" class="toggle-input">
+                  <span class="toggle-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+              <label class="toggle-row">
+                <span>
+                  <strong>Show startup errors</strong>
+                  <small>display_startup_errors — boot / ini load failures</small>
+                </span>
+                <span class="toggle-wrap">
+                  <input type="checkbox" id="phpini-display_startup_errors" class="toggle-input">
+                  <span class="toggle-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+              <label class="toggle-row">
+                <span>
+                  <strong>Log errors to file</strong>
+                  <small>log_errors — write to error_log path</small>
+                </span>
+                <span class="toggle-wrap">
+                  <input type="checkbox" id="phpini-log_errors" class="toggle-input">
+                  <span class="toggle-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+              <label class="toggle-row php-adv-only hidden">
+                <span>
+                  <strong>HTML-formatted errors</strong>
+                  <small>html_errors — styled error output</small>
+                </span>
+                <span class="toggle-wrap">
+                  <input type="checkbox" id="phpini-html_errors" class="toggle-input">
+                  <span class="toggle-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+              <label class="toggle-row php-adv-only hidden">
+                <span>
+                  <strong>Expose PHP version</strong>
+                  <small>expose_php — X-Powered-By header</small>
+                </span>
+                <span class="toggle-wrap">
+                  <input type="checkbox" id="phpini-expose_php" class="toggle-input">
+                  <span class="toggle-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Error reporting level</h2>
+            <p class="muted">Which severity types PHP reports. Active levels show as badges above.</p>
+
+            <div class="preset-row" id="phpini-presets"></div>
+
+            <div class="level-chips" id="phpini-levels" role="group" aria-label="Error levels">
+              <button type="button" class="level-chip error" data-level="error">
+                <span class="level-dot"></span>Error
+              </button>
+              <button type="button" class="level-chip warn" data-level="warning">
+                <span class="level-dot"></span>Warning
+              </button>
+              <button type="button" class="level-chip notice" data-level="notice">
+                <span class="level-dot"></span>Notice
+              </button>
+              <button type="button" class="level-chip notice" data-level="deprecated">
+                <span class="level-dot"></span>Deprecated
+              </button>
+              <button type="button" class="level-chip info" data-level="strict">
+                <span class="level-dot"></span>Strict
+              </button>
+            </div>
+
+            <div class="php-adv-only hidden" style="margin-top:14px">
+              <label class="field-label">error_reporting expression
+                <input type="text" id="phpini-error_reporting" class="field-input mono" spellcheck="false" placeholder="E_ALL">
+              </label>
+              <p class="meta">Editing chips updates this. You can also type a custom expression.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card php-adv-only hidden" style="margin-top:14px" id="phpini-advanced">
+          <h2>Limits &amp; uploads</h2>
+          <p class="muted">Common resource and upload settings.</p>
+          <div class="form-grid">
+            <label class="field-label">Memory limit
+              <input type="text" id="phpini-memory_limit" class="field-input" placeholder="128M">
+            </label>
+            <label class="field-label">Max execution time (sec)
+              <input type="text" id="phpini-max_execution_time" class="field-input" placeholder="30">
+            </label>
+            <label class="field-label">Post max size
+              <input type="text" id="phpini-post_max_size" class="field-input" placeholder="8M">
+            </label>
+            <label class="field-label">Upload max filesize
+              <input type="text" id="phpini-upload_max_filesize" class="field-input" placeholder="2M">
+            </label>
+            <label class="field-label">Timezone
+              <input type="text" id="phpini-date_timezone" class="field-input" placeholder="Asia/Kolkata">
+            </label>
+            <label class="field-label">Error log path
+              <input type="text" id="phpini-error_log" class="field-input mono" placeholder="C:/web/php…/logs/php_errors.log">
+            </label>
+          </div>
+          <div class="toggle-list" style="margin-top:12px">
+            <label class="toggle-row">
+              <span>
+                <strong>File uploads</strong>
+                <small>file_uploads</small>
+              </span>
+              <span class="toggle-wrap">
+                <input type="checkbox" id="phpini-file_uploads" class="toggle-input">
+                <span class="toggle-ui" aria-hidden="true"></span>
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span>
+                <strong>Allow URL fopen</strong>
+                <small>allow_url_fopen — remote include/open</small>
+              </span>
+              <span class="toggle-wrap">
+                <input type="checkbox" id="phpini-allow_url_fopen" class="toggle-input">
+                <span class="toggle-ui" aria-hidden="true"></span>
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span>
+                <strong>Short open tags</strong>
+                <small>short_open_tag — &lt;? … ?&gt;</small>
+              </span>
+              <span class="toggle-wrap">
+                <input type="checkbox" id="phpini-short_open_tag" class="toggle-input">
+                <span class="toggle-ui" aria-hidden="true"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <p class="meta" style="margin-top:12px" id="phpini-hint"></p>
+      </section>
+
       <section class="section" id="view-config">
         <div class="card">
           <div class="toolbar">
@@ -247,6 +422,6 @@ require __DIR__ . '/includes/bootstrap.php';
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="assets/app.js?v=8"></script>
+  <script src="assets/app.js?v=9"></script>
 </body>
 </html>
