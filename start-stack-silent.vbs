@@ -1,4 +1,5 @@
-' Fully silent stack start — PHP + Mailpit + Apache, no console windows.
+' Fully silent stack start — default PHP + Mailpit + Apache, no console windows.
+' On Windows Startup / tray launch: only the panel default PHP is started (not all versions).
 Option Explicit
 
 Dim WshShell, fso
@@ -7,9 +8,7 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 
 Const WEB = "C:\web"
 
-StartPhp "C:\web\php7.4.33", 9074
-StartPhp "C:\web\php8.0.30", 9080
-StartPhp "C:\web\php8.4.26", 9084
+StartDefaultPhp
 
 ' Local mail catcher (SMTP 1025 / UI 8025)
 If fso.FileExists(WEB & "\start-mailpit-silent.vbs") Then
@@ -21,6 +20,44 @@ End If
 StartApacheWithRetry
 
 WScript.Quit 0
+
+Sub StartDefaultPhp
+  Dim ver
+  ver = GetDefaultPhpVersion()
+  Select Case ver
+    Case "7.4"
+      StartPhp "C:\web\php7.4.33", 9074
+    Case "8.4"
+      StartPhp "C:\web\php8.4.26", 9084
+    Case Else
+      StartPhp "C:\web\php8.0.30", 9080
+  End Select
+End Sub
+
+Function GetDefaultPhpVersion()
+  Dim path, raw, p, q1, q2, ver
+  GetDefaultPhpVersion = "8.0"
+  path = WEB & "\htdocs\panel\data\settings.json"
+  If Not fso.FileExists(path) Then Exit Function
+  raw = ReadAllText(path)
+  p = InStr(1, LCase(raw), """default_php""")
+  If p < 1 Then Exit Function
+  p = InStr(p, raw, ":")
+  If p < 1 Then Exit Function
+  q1 = InStr(p, raw, """")
+  If q1 < 1 Then Exit Function
+  q2 = InStr(q1 + 1, raw, """")
+  If q2 <= q1 Then Exit Function
+  ver = Mid(raw, q1 + 1, q2 - q1 - 1)
+  If ver = "7.4" Or ver = "8.0" Or ver = "8.4" Then GetDefaultPhpVersion = ver
+End Function
+
+Function ReadAllText(path)
+  Dim ts
+  Set ts = fso.OpenTextFile(path, 1)
+  ReadAllText = ts.ReadAll
+  ts.Close
+End Function
 
 Sub StartPhp(phpDir, port)
   Dim exe

@@ -67,6 +67,8 @@ try {
             ]);
 
         case 'start_apache':
+            // Default PHP is paired with Apache for localhost
+            start_php_version(default_php_version());
             if (process_running('httpd.exe')) {
                 json_out(['ok' => true, 'message' => 'Apache already running', 'data' => service_status()]);
             }
@@ -76,12 +78,18 @@ try {
             }
             start_hidden('wscript //B //Nologo "' . str_replace('/', '\\', WEB_ROOT) . '\start-httpd-silent.vbs"');
             usleep(900000);
-            json_out(['ok' => true, 'message' => 'Apache started', 'data' => service_status()]);
+            json_out(['ok' => true, 'message' => 'Apache started (default PHP ' . default_php_version() . ')', 'data' => service_status()]);
 
         case 'stop_apache':
             run_cmd('taskkill /F /IM httpd.exe');
+            $phpStop = stop_php_version(default_php_version(), true);
             usleep(500000);
-            json_out(['ok' => true, 'message' => 'Apache stopped', 'data' => service_status()]);
+            json_out([
+                'ok' => true,
+                'message' => 'Apache stopped · default PHP ' . default_php_version() . ' stopped',
+                'detail' => $phpStop['message'] ?? '',
+                'data' => service_status(),
+            ]);
 
         case 'restart_apache':
             $restart = restart_apache_process(false);

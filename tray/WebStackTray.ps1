@@ -87,9 +87,13 @@ function Stop-PhpOthers {
 
 function Stop-Apache {
   Start-Process -FilePath 'taskkill.exe' -ArgumentList @('/F', '/IM', 'httpd.exe') -WindowStyle Hidden -Wait
+  # Default PHP only serves via Apache — stop it too
+  Stop-PhpVersion (Get-DefaultPhp) -ForceDefault
 }
 
 function Start-Apache {
+  # Bring default PHP back with Apache
+  Start-PhpVersion (Get-DefaultPhp)
   if (Test-Port 80) { return }
   $vbs = Join-Path $WebRoot 'start-httpd-silent.vbs'
   if (Test-Path $vbs) {
@@ -175,7 +179,7 @@ Add-MenuItem 'Open Stack Panel' { Start-Process $PanelUrl } | Out-Null
 Add-MenuItem 'Open localhost' { Start-Process 'http://localhost/' } | Out-Null
 Add-MenuItem 'Open Mail inbox' { Start-Process 'http://127.0.0.1:8025/' } | Out-Null
 Add-Separator
-Add-MenuItem 'Start All (Apache + PHP + Mail)' { Start-StackSilent; Start-Sleep -Seconds 1; Update-Tray } | Out-Null
+Add-MenuItem 'Start All (Apache + default PHP + Mail)' { Start-StackSilent; Start-Sleep -Seconds 1; Update-Tray } | Out-Null
 Add-MenuItem 'Stop PHP (keep default)' { Stop-PhpOthers; Update-Tray } | Out-Null
 Add-MenuItem 'Stop Apache' { Stop-Apache; Update-Tray } | Out-Null
 Add-MenuItem 'Restart Apache' {
