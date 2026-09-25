@@ -1,0 +1,39 @@
+# --- Zip / redistributable runtime (download separately) ---
+# Apache Lounge build (keep conf only)
+/Apache24/**
+!/Apache24/conf/
+!/Apache24/conf/**
+
+# PHP Windows builds
+/php*/
+/php*/**
+
+# Apache Lounge / package junk
+/-- Win32 VS18  --
+/ReadMe.txt
+/Security.txt
+/New Text Document.txt
+*.zip
+
+# Runtime logs & pid
+**/logs/
+*.log
+*.pid
+Apache24/logs/
+
+# --- htdocs: keep panel, phpmyadmin, root index only ---
+/htdocs/**
+!/htdocs/index.php
+!/htdocs/panel/
+!/htdocs/panel/**
+!/htdocs/phpmyadmin/
+!/htdocs/phpmyadmin/**
+
+# Local panel runtime (optional; uncomment to skip machine-specific data)
+# /htdocs/panel/data/settings.json
+# /htdocs/panel/data/sites.json
+# /htdocs/panel/data/hosts.block.txt
+/htdocs/panel/data/*.bak*
+/htdocs/panel/data/_run_hidden.vbs
+
+# --- Keep (not ignored): tray/, *.bat, *.vbs, *.ps1, .gitignore ---
